@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="HandheldFriendly" content="true">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Mercadona</title>
+    <link rel="stylesheet" href="https://descargas.mercadona.com/outofservice/estaticos/css/mantenimiento.css" />
+	<style>.pt {display: none}</style>
+</head>
+<body>
+	<div class="webpage">
+		<header class="header">
+			<div class="top">
+				<div class="container">
+				</div>
+			</div>
+			<div class="container">
+				<div class="row vertical-align header-logo">
+					<div class="col-xs-12 col-sm-8 logo">
+						<img src="https://descargas.mercadona.com/outofservice/estaticos/images/mercadona-logo.png" alt="mercadona" width="250">
+						<span class="hidden">Logo Mercadona</span>
+					</div>
+					<div class="es col-sm-4 col-xs-12 posicion-compra">
+						<div id="espanolCompra">
+							<a href="https://www.mercadona.es/entrada.php?nidioma=1" class="btn btn-rounded-shop buy-button">
+								Compra online
+							</a>
+						</div>
+					</div>
+				</div>
+			</div>
+		</header>
+
+		<div class="contents">
+			<div class="cuerpo">
+				<div class="es paragraph">
+					<p>Ha habido un error en la página web, si el problema continua, por favor, adjunte el código de error y póngase en contacto con:
+					<a href="https://info.mercadona.es/es/atencion-al-cliente">Atención al Cliente</a> </p>
+					<p>Codigo de error: 0.7564645f.1782120460.9212d5c1
+					<br><br><a id="back-button-js" href='javascript:history.back();'>Retroceder</a>
+					<noscript>
+						<a href="/">Retroceder</a>
+						<style>#back-button-js { display:none; }</style>
+					</noscript></p>
+					<p>Disculpe las molestias.</p>
+				</div>
+				<div class="pt paragraph">
+					<p> Ocorreu um erro no site, se o problema persistir, entre em contato com: Apoio ao cliente e anexe o código do erro. </p>
+					<a href="https://www.mercadona.pt/pt/apoio-cliente">Apoio ao cliente</a> </p>
+					<p> Código do erro: 0.7564645f.1782120460.9212d5c1
+					<br><br><a href='javascript:history.back();'>Voltar</a></p>
+					<p> Desculpe pelo transtorno. </p>
+				</div>
+			</div>
+
+			<div class="es">
+				<section class="col-xs-12 col-sm-6 col-lg-3">
+					<a href="https://www.mercadona.es/entrada.php?nidioma=1">
+
+						COMPRA ONLINE
+					</a>
+					<p>Tienda online de Mercadona donde podrás comprar todos nuestros productos y recibirlos en tu casa.</p>
+				</section>
+				<section class="col-xs-12 col-sm-6 col-lg-3">
+					<a href="https://www.portalcliente.mercadona.es/pclie/web/op.htm?operation=pclie.flow.inicio&amp;fwk.locale=es_ES">
+
+						FACTURA CLIENTES
+					</a>
+					<p>Servicio gratuito que te permite gestionar todas tus facturas de forma sencilla, cómoda y segura.</p>
+				</section>
+				<section class="col-xs-12 col-sm-6 col-lg-3">
+					<a href="https://www.facturas.mercadona.es/PortalWeb/Acceso.do">
+
+						E-FACTURA PROVEEDORES
+					</a>
+					<p>Creado por Mercadona para que nuestros proveedores, que no disponen del servicio EDI, puedan emitir facturas electrónicas.</p>
+				</section>
+				<section class="col-xs-12 col-sm-6 col-lg-3">
+					<a href="https://mercadona.avature.net/Careers/SearchJobs/?3_60_3=243">
+
+						TRABAJA EN MERCADONA
+					</a>
+					<p>Un modelo de recursos humanos reconocido por ofrecer puestos de trabajo estables y de calidad.</p>
+				</section>
+			</div>
+		</div>
+	</div>
+	<script>
+		var host = window.location.host;
+		var elemShow = host.indexOf("mercadona.pt")>=0 ? document.querySelectorAll('.pt') : document.querySelectorAll('.es');
+		var elemHide = host.indexOf("mercadona.pt")>=0 ? document.querySelectorAll('.es') : document.querySelectorAll('.pt');
+		elemShow.forEach(el => { el.style.display = "initial"; });
+		elemHide.forEach(el => { el.style.display = "none"; });
+	</script>
+</body></html>
