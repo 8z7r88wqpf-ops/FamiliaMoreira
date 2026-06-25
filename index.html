@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CompraDelMes - Gestão completa da sua casa">
+    <meta name="theme-color" content="#11845b">
+    <title>CompraDelMes</title>
+    <link rel="stylesheet" href="assets/css/compradelmes.css">
+    <style>
+        * { margin:0;padding:0;box-sizing:border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f0faf6 0%, #e8f5f0 50%, #f5faf8 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .landing-container { max-width: 1100px; width: 100%; text-align: center; }
+        .logo { font-size: 2.5rem; font-weight: 800; color: var(--primary); margin-bottom: 6px; letter-spacing: -1px; }
+        .logo span { color: var(--primary-dark); }
+        .subtitle { color: var(--muted); font-size: 1.1rem; margin-bottom: 8px; }
+        .badge-strip { display: flex; gap: 10px; justify-content: center; margin-bottom: 30px; flex-wrap: wrap; }
+        .badge-strip span { background: rgba(17,132,91,0.08); color: var(--primary); padding: 4px 12px; border-radius: 20px; font-size: .8rem; font-weight: 600; }
+        .modules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-bottom: 30px; }
+        .module-card {
+            background: white; border-radius: 16px; padding: 24px 20px; text-decoration: none; color: inherit;
+            transition: all 0.3s ease; box-shadow: 0 2px 12px rgba(0,0,0,0.06); border: 2px solid transparent;
+            display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer;
+        }
+        .module-card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(17,132,91,0.12); border-color: var(--primary); }
+        .module-card .icon { font-size: 2.5rem; line-height: 1; }
+        .module-card .title { font-size: 1.05rem; font-weight: 700; color: var(--text); }
+        .module-card .desc { font-size: .82rem; color: var(--muted); line-height: 1.4; }
+        .module-card .badge {
+            background: var(--primary); color: white; font-size: .65rem; padding: 2px 10px; border-radius: 20px; font-weight: 600;
+        }
+        .module-card .badge.outline { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+        .module-card.inactive { opacity: .6; }
+        .module-card .count { font-size: .75rem; color: var(--muted); }
+        .footer-links { margin-top: 10px; display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+        .footer-links a { color: var(--muted); text-decoration: none; font-size: .85rem; transition: color .2s; }
+        .footer-links a:hover { color: var(--primary); }
+        @media (max-width:500px) { .modules-grid { grid-template-columns: 1fr 1fr; } .logo { font-size: 1.8rem; } }
+    </style>
+</head>
+<body>
+<div class="landing-container">
+    <div class="logo">CompraDel<span>Mes</span> 🏠</div>
+    <p class="subtitle">A sua central de gestão doméstica inteligente</p>
+    <div class="badge-strip">
+        <span>📸 Scanner IA</span>
+        <span>🤖 Otimizador</span>
+        <span>📊 Stock</span>
+        <span>🥘 Receitas</span>
+        <span>💰 Finanças</span>
+        <span>📈 Histórico</span>
+    </div>
+
+    <div class="modules-grid">
+        <a href="app.html" class="module-card">
+            <div class="icon">🛒</div>
+            <div class="title">Comparar Preços</div>
+            <div class="desc">Pesquise produtos e compare preços em 5 supermercados</div>
+            <span class="badge">417 produtos</span>
+        </a>
+
+        <a href="listas.html" class="module-card">
+            <div class="icon">📋</div>
+            <div class="title">Listas de Compras</div>
+            <div class="desc">Crie listas inteligentes com totais por supermercado</div>
+            <span class="badge">Activo</span>
+        </a>
+
+        <a href="scanner.html" class="module-card">
+            <div class="icon">📸</div>
+            <div class="title">Scanner de Faturas</div>
+            <div class="desc">Tire foto à fatura e a IA importa tudo automaticamente</div>
+            <span class="badge">🤖 IA</span>
+        </a>
+
+        <a href="otimizador.html" class="module-card">
+            <div class="icon">🤖</div>
+            <div class="title">Otimizador IA</div>
+            <div class="desc">Descubra onde comprar cada produto para gastar menos</div>
+            <span class="badge">Poupa até 16%</span>
+        </a>
+
+        <a href="stock.html" class="module-card">
+            <div class="icon">🍚</div>
+            <div class="title">Stock da Cozinha</div>
+            <div class="desc">Controlo de dispensa, validades e alertas de expiração</div>
+            <span class="badge">Novo!</span>
+        </a>
+
+        <a href="receitas.html" class="module-card">
+            <div class="icon">🥘</div>
+            <div class="title">Receitas Inteligentes</div>
+            <div class="desc">Descubra receitas com o que tem na cozinha</div>
+            <span class="badge">Novo!</span>
+        </a>
+
+        <a href="financas.html" class="module-card">
+            <div class="icon">💰</div>
+            <div class="title">Finanças</div>
+            <div class="desc">Orçamento mensal, controlo de gastos por supermercado</div>
+            <span class="badge">Novo!</span>
+        </a>
+
+        <a href="historico.html" class="module-card">
+            <div class="icon">📈</div>
+            <div class="title">Histórico de Preços</div>
+            <div class="desc">Veja a evolução dos preços e preveja tendências</div>
+            <span class="badge">Novo!</span>
+        </a>
+    </div>
+
+    <div class="footer-links">
+        <a href="Futuro.txt">📄 Roadmap</a>
+        <a href="#" onclick="if(confirm('Instalar todos os módulos?')){fetch('api/instalar_modulos.php',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(r=>r.json()).then(d=>alert(d.message)).catch(e=>alert('Erro: '+e.message))}">⚙️ Instalar módulos</a>
+    </div>
+</div>
+</body>
+</html>

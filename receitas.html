@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CompraDelMes - Receitas</title>
+    <link rel="stylesheet" href="assets/css/compradelmes.css">
+    <style>
+        .back-link { display:inline-flex;align-items:center;gap:6px;color:var(--muted);text-decoration:none;font-size:.85rem;margin-bottom:12px; }
+        .back-link:hover { color:var(--primary); }
+        .rec-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px; }
+        .rec-card { border:1px solid var(--line);border-radius:var(--radius);padding:18px;cursor:pointer;transition:all .2s; }
+        .rec-card:hover { border-color:var(--primary);box-shadow:0 2px 12px rgba(0,0,0,.06); }
+        .rec-card .nome { font-size:1.1rem;font-weight:700; }
+        .rec-card .meta { font-size:.8rem;color:var(--muted);margin:4px 0; }
+        .rec-card .stock-bar { height:4px;background:var(--line);border-radius:4px;margin:8px 0;overflow:hidden; }
+        .rec-card .stock-bar .fill { height:100%;background:var(--primary);border-radius:4px; }
+        .rec-card .ing-count { font-size:.8rem;color:var(--muted); }
+        .rec-detail { max-width:700px;margin:0 auto; }
+        .rec-detail .header { margin-bottom:20px; }
+        .rec-detail .instrucoes { white-space:pre-wrap;line-height:1.6; }
+        .ing-item { display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line); }
+        .ing-item .tem { color:var(--primary); }
+        .ing-item .falta { color:var(--danger); }
+    </style>
+</head>
+<body>
+<div class="container">
+    <a href="index.html" class="back-link">← Voltar ao início</a>
+    <header><h1>🥘 Receitas</h1>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="showSugestao()">💡 Sugerir do stock</button>
+            <button class="btn btn-primary" onclick="showCriar()">+ Nova Receita</button>
+        </div>
+    </header>
+
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <input type="text" id="searchRec" placeholder="Pesquisar receitas..." oninput="loadReceitas()" style="flex:1;padding:8px;border:1px solid var(--line);border-radius:var(--radius);">
+        <button class="btn btn-secondary" onclick="loadReceitas()">🔍</button>
+        <button class="btn btn-secondary" onclick="loadReceitas('stock')">🍚 Com o que tenho</button>
+    </div>
+
+    <div id="recContainer" class="rec-grid"></div>
+</div>
+
+<!-- Modal Ver Receita -->
+<div class="modal-overlay" id="viewModal"><div class="modal" style="max-height:80vh;overflow-y:auto;">
+    <h2 id="viewNome"></h2>
+    <div id="viewMeta" style="font-size:.85rem;color:var(--muted);margin-bottom:12px;"></div>
+    <div id="viewStockBar" style="height:4px;background:var(--line);border-radius:4px;margin-bottom:12px;overflow:hidden;"></div>
+    <h3 style="font-size:.9rem;margin-bottom:8px;">🛒 Ingredientes</h3>
+    <div id="viewIngredientes"></div>
+    <h3 style="font-size:.9rem;margin:12px 0 8px;">📝 Instruções</h3>
+    <div id="viewInstrucoes" class="instrucoes" style="font-size:.9rem;"></div>
+    <div style="margin-top:15px;display:flex;gap:8px;">
+        <button class="btn btn-primary" onclick="criarListaCompra()">📋 Criar lista de compras</button>
+        <button class="btn btn-secondary" onclick="closeModal('viewModal')">Fechar</button>
+    </div>
+</div></div>
+
+<!-- Modal Criar -->
+<div class="modal-overlay" id="criarModal"><div class="modal" style="max-height:80vh;overflow-y:auto;">
+    <h2>Nova Receita</h2>
+    <input type="text" id="recNome" placeholder="Nome da receita" style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--line);border-radius:var(--radius);">
+    <textarea id="recDesc" placeholder="Descrição..." style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--line);border-radius:var(--radius);"></textarea>
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <input type="number" id="recPrep" placeholder="Preparo (min)" style="flex:1;padding:8px;border:1px solid var(--line);border-radius:var(--radius);">
+        <input type="number" id="recCoz" placeholder="Cozimento (min)" style="flex:1;padding:8px;border:1px solid var(--line);border-radius:var(--radius);">
+        <input type="number" id="recPor" value="4" style="width:60px;padding:8px;border:1px solid var(--line);border-radius:var(--radius);">
+    </div>
+    <h3 style="font-size:.9rem;margin-bottom:8px;">Ingredientes</h3>
+    <div id="ingList"></div>
+    <button class="btn btn-sm btn-secondary" onclick="addIngField()" style="margin-bottom:8px;">+ Ingrediente</button>
+    <textarea id="recInst" placeholder="Instruções de preparo..." style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--line);border-radius:var(--radius);min-height:100px;"></textarea>
+    <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal('criarModal')">Cancelar</button>
+        <button class="btn btn-primary" onclick="criarReceita()">Guardar</button>
+    </div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+<script>
+    const API={async get(u){const r=await fetch(u);if(!r.ok)throw new Error();return r.json()},async post(u,d){const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(!r.ok)throw new Error();return r.json()},async del(u){const r=await fetch(u,{method:'DELETE'});if(!r.ok)throw new Error();return r.json()}};
+    function showToast(m,t='success'){const e=document.getElementById('toast');e.textContent=m;e.className='toast '+t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),3000);}
+    function closeModal(id){document.getElementById(id).classList.remove('active');}
+    function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]));}
+
+    let currentReceitaId = null;
+    let ingCount = 0;
+
+    async function loadReceitas(filter) {
+        const s = document.getElementById('searchRec').value;
+        let url = 'api/receitas.php?';
+        if (s) url += '&search='+encodeURIComponent(s);
+        if (filter === 'stock') url += '&com_stock=sim';
+        
+        try {
+            const data = await API.get(url);
+            const c = document.getElementById('recContainer');
+            if (data.length === 0) { c.innerHTML = '<div class="empty-state"><p>Nenhuma receita encontrada</p></div>'; return; }
+            c.innerHTML = data.map(r => `<div class="rec-card" onclick="verReceita(${r.id})">
+                <div class="nome">${escapeHtml(r.nome)}</div>
+                <div class="meta">⏱️ ${r.tempo_preparo||'?'}min • 🍽️ ${r.porcoes||4} porções</div>
+                <div class="ing-count">${r.num_ingredientes} ingredientes</div>
+            </div>`).join('');
+        } catch(e) { document.getElementById('recContainer').innerHTML = '<p style="color:var(--danger)">Erro</p>'; }
+    }
+
+    async function verReceita(id) {
+        try {
+            const r = await API.get('api/receitas.php?id='+id);
+            currentReceitaId = r.id;
+            document.getElementById('viewNome').textContent = r.nome;
+            document.getElementById('viewMeta').textContent = `⏱️ ${r.tempo_preparo||'?'}min preparo • 🍳 ${r.tempo_cozimento||'?'}min cozimento • 🍽️ ${r.porcoes||4} porções`;
+            
+            const bar = document.getElementById('viewStockBar');
+            if (r.stock_percent !== undefined) {
+                const cor = r.stock_percent > 50 ? 'var(--primary)' : r.stock_percent > 25 ? 'var(--warning)' : 'var(--danger)';
+                bar.innerHTML = `<div class="fill" style="width:${r.stock_percent}%;background:${cor};"></div>`;
+                bar.style.display = 'block';
+            } else bar.style.display = 'none';
+
+            document.getElementById('viewIngredientes').innerHTML = (r.ingredientes||[]).map(i => `
+                <div class="ing-item">
+                    <span>${escapeHtml(i.produto_nome)} ${i.marca?'- '+escapeHtml(i.marca):''}</span>
+                    <span>${i.quantidade} ${i.unidade} ${i.tem_stock ? '<span class="tem">✅</span>' : '<span class="falta">❌</span>'}</span>
+                </div>
+            `).join('');
+
+            document.getElementById('viewInstrucoes').textContent = r.instrucoes || 'Sem instruções';
+            document.getElementById('viewModal').classList.add('active');
+        } catch(e) { showToast('Erro','error'); }
+    }
+
+    async function showSugestao() {
+        try {
+            const data = await API.post('api/receitas.php', {action: 'sugerir'});
+            const c = document.getElementById('recContainer');
+            if (data.length === 0) { c.innerHTML = '<div class="empty-state"><p>Sem stock suficiente para sugestões</p></div>'; return; }
+            c.innerHTML = '<h3 style="margin-bottom:12px;">💡 Receitas que pode fazer com o que tem:</h3>' + 
+                data.map(r => `<div class="rec-card" onclick="verReceita(${r.id})">
+                    <div class="nome">${escapeHtml(r.nome)}</div>
+                    <div class="meta">🧩 ${r.match_count} ingredientes em stock</div>
+                    <div class="ing-count">${r.num_ingredientes} ingredientes totais</div>
+                </div>`).join('');
+        } catch(e) { showToast('Erro','error'); }
+    }
+
+    function showCriar() {
+        document.getElementById('criarModal').classList.add('active');
+        document.getElementById('ingList').innerHTML = '';
+        addIngField();
+        addIngField();
+        addIngField();
+    }
+
+    async function addIngField() {
+        try {
+            const r = await API.get('api/productos.php?limit=500');
+            const prods = r.productos || r;
+            const div = document.getElementById('ingList');
+            const idx = ingCount++;
+            div.innerHTML += `<div class="ing-row" style="display:flex;gap:4px;margin-bottom:4px;">
+                <select id="ingProd${idx}" style="flex:1;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:.85rem;">
+                    <option value="">Produto...</option>
+                    ${prods.map(p => `<option value="${p.id}">${escapeHtml(p.nome)}${p.marca?' - '+escapeHtml(p.marca):''}</option>`).join('')}
+                </select>
+                <input type="number" id="ingQtd${idx}" value="1" min="0.1" step="0.1" style="width:50px;padding:6px;border:1px solid var(--line);border-radius:4px;">
+                <select id="ingUn${idx}" style="width:50px;padding:6px;border:1px solid var(--line);border-radius:4px;">
+                    <option value="un">un</option><option value="g">g</option><option value="kg">kg</option><option value="L">L</option><option value="ml">ml</option>
+                </select>
+            </div>`;
+        } catch(e) {}
+    }
+
+    async function criarReceita() {
+        const nome = document.getElementById('recNome').value.trim();
+        if (!nome) { showToast('Nome é obrigatório','error'); return; }
+        
+        const ingredientes = [];
+        for (let i = 0; i < ingCount; i++) {
+            const el = document.getElementById('ingProd'+i);
+            if (el && el.value) {
+                ingredientes.push({
+                    producto_id: parseInt(el.value),
+                    quantidade: parseFloat(document.getElementById('ingQtd'+i).value || 1),
+                    unidade: document.getElementById('ingUn'+i).value
+                });
+            }
+        }
+        
+        try {
+            await API.post('api/receitas.php', {
+                nome: nome,
+                descricao: document.getElementById('recDesc').value.trim(),
+                tempo_preparo: parseInt(document.getElementById('recPrep').value) || 0,
+                tempo_cozimento: parseInt(document.getElementById('recCoz').value) || 0,
+                porcoes: parseInt(document.getElementById('recPor').value) || 4,
+                instrucoes: document.getElementById('recInst').value.trim(),
+                ingredientes: ingredientes
+            });
+            showToast('Receita criada!');
+            closeModal('criarModal');
+            loadReceitas();
+        } catch(e) { showToast('Erro ao criar','error'); }
+    }
+
+    async function criarListaCompra() {
+        if (!currentReceitaId) return;
+        try {
+            const r = await API.get('api/receitas.php?id='+currentReceitaId);
+            const nome = "Compras: " + r.nome;
+            const res = await API.post('api/listas.php', {nombre: nome});
+            const listaId = res.id;
+            
+            for (const ing of (r.ingredientes||[])) {
+                if (!ing.tem_stock) {
+                    const precos = await API.get('api/precios.php?producto_id='+ing.producto_id);
+                    if (precos.length > 0) {
+                        await API.post('api/lista_items.php', {
+                            lista_id: listaId,
+                            producto_id: ing.producto_id,
+                            precio_id: precos[0].id,
+                            cantidad: Math.ceil(ing.quantidade)
+                        });
+                    }
+                }
+            }
+            showToast('Lista criada com os ingredientes em falta!');
+            closeModal('viewModal');
+        } catch(e) { showToast('Erro ao criar lista','error'); }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => loadReceitas());
+</script>
+</body>
+</html>

@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CompraDelMes - Otimizador de Compras</title>
+    <link rel="stylesheet" href="assets/css/compradelmes.css">
+    <style>
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+            transition: color 0.2s;
+        }
+        .back-link:hover { color: var(--primary); }
+
+        .rank-card {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            margin-bottom: 10px;
+            transition: all 0.2s;
+        }
+        .rank-card:hover { border-color: var(--primary); background: var(--bg); }
+        .rank-card .position {
+            font-size: 1.5rem;
+            font-weight: 800;
+            width: 40px;
+            text-align: center;
+            color: var(--muted);
+        }
+        .rank-card.best {
+            border-color: var(--primary);
+            background: #f0faf6;
+        }
+        .rank-card.best .position { color: var(--primary); }
+        .rank-card .info { flex: 1; }
+        .rank-card .info .name { font-weight: 700; }
+        .rank-card .info .stats { font-size: 0.85rem; color: var(--muted); }
+        .rank-card .price { font-size: 1.2rem; font-weight: 700; color: var(--primary); }
+
+        .result-item {
+            padding: 12px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            margin-bottom: 8px;
+        }
+        .result-item .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .result-item .product-name { font-weight: 600; }
+        .result-item .supermercado-name { color: var(--primary); font-size: 0.85rem; }
+        .result-item .price { font-size: 1.1rem; font-weight: 700; }
+        .prices-compare {
+            display: flex;
+            gap: 8px;
+            margin-top: 6px;
+            flex-wrap: wrap;
+        }
+        .prices-compare .tag {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            background: var(--bg);
+            border: 1px solid var(--line);
+        }
+        .prices-compare .tag.best {
+            background: #e8f5e9;
+            border-color: var(--primary);
+            font-weight: 600;
+        }
+
+        .supermercado-group {
+            margin-top: 15px;
+        }
+        .supermercado-group h3 {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background: var(--bg);
+            border-radius: var(--radius);
+            margin-bottom: 8px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+        }
+        .tab {
+            padding: 10px 18px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            background: white;
+        }
+        .tab.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        .tab:hover:not(.active) {
+            border-color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← Voltar ao início</a>
+        
+        <header>
+            <h1>Otimizador de <span>Compras</span></h1>
+            <div class="header-actions">
+                <span style="font-size:13px;color:var(--muted);">🤖 IA que encontra o melhor preço</span>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('geral', this)">📊 Geral</div>
+            <div class="tab" onclick="switchTab('categoria', this)">📂 Por Categoria</div>
+            <div class="tab" onclick="switchTab('lista', this)">📋 Otimizar Lista</div>
+        </div>
+
+        <!-- Tab: Geral -->
+        <div id="tab-geral">
+            <div class="card">
+                <h2>🏪 Ranking de Supermercados</h2>
+                <p style="font-size:13px;color:var(--gray);margin-bottom:15px;">
+                    Análise de qual supermercado tem os melhores preços no geral.
+                </p>
+                <button class="btn btn-primary" onclick="analisarGeral()">📊 Analisar preços</button>
+                <div id="geralResults" style="margin-top:15px;"></div>
+            </div>
+        </div>
+
+        <!-- Tab: Por Categoria -->
+        <div id="tab-categoria" style="display:none;">
+            <div class="card">
+                <h2>📂 Melhor Supermercado por Categoria</h2>
+                <p style="font-size:13px;color:var(--gray);margin-bottom:15px;">
+                    Descubra onde comprar cada tipo de produto.
+                </p>
+                <select id="categoriaSelect" class="supermercado-select" style="width:100%;margin-bottom:10px;">
+                    <option value="">Selecionar categoria...</option>
+                </select>
+                <button class="btn btn-primary" onclick="analisarCategoria()">🔍 Analisar</button>
+                <div id="categoriaResults" style="margin-top:15px;"></div>
+            </div>
+        </div>
+
+        <!-- Tab: Otimizar Lista -->
+        <div id="tab-lista" style="display:none;">
+            <div class="card">
+                <h2>📋 Otimizar Lista de Compras</h2>
+                <p style="font-size:13px;color:var(--gray);margin-bottom:15px;">
+                    A IA distribui a sua lista pelos supermercados para pagar o mínimo possível.
+                </p>
+                <select id="listaSelect" class="supermercado-select" style="width:100%;margin-bottom:10px;">
+                    <option value="">Selecionar lista...</option>
+                </select>
+                <button class="btn btn-primary" onclick="otimizarLista()">🤖 Otimizar lista</button>
+                <div id="listaResults" style="margin-top:15px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast" role="alert" aria-live="assertive"></div>
+
+    <script>
+        function showToast(msg, type = 'success') {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast ' + type;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        function escapeHtml(v) {
+            return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]));
+        }
+
+        function formatCurrency(v) {
+            return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(Number(v || 0));
+        }
+
+        function switchTab(tab, btn) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            ['geral', 'categoria', 'lista'].forEach(t => {
+                document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
+            });
+        }
+
+        // Load categories & lists
+        async function loadCategories() {
+            try {
+                const r = await fetch('api/categorias.php');
+                const data = await r.json();
+                const sel = document.getElementById('categoriaSelect');
+                data.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c;
+                    opt.textContent = c;
+                    sel.appendChild(opt);
+                });
+            } catch(e) {}
+        }
+
+        async function loadLists() {
+            try {
+                const r = await fetch('api/listas.php');
+                const data = await r.json();
+                const sel = document.getElementById('listaSelect');
+                data.forEach(l => {
+                    const opt = document.createElement('option');
+                    opt.value = l.id;
+                    opt.textContent = l.nombre;
+                    sel.appendChild(opt);
+                });
+            } catch(e) {}
+        }
+
+        // Tab: Geral
+        async function analisarGeral() {
+            const div = document.getElementById('geralResults');
+            div.innerHTML = '<div class="loading">A analisar preços...</div>';
+            try {
+                const r = await fetch('api/otimizar_compras.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: '{}'
+                });
+                const data = await r.json();
+                if (!data.success) { div.innerHTML = '<p style="color:var(--danger)">Erro: ' + data.error + '</p>'; return; }
+                
+                let html = `<div style="margin-bottom:12px;padding:12px;background:#f0faf6;border-radius:var(--radius);">
+                    <strong style="color:var(--primary);">🥇 Melhor: ${escapeHtml(data.melhor_supermercado)}</strong>
+                    <span style="margin-left:10px;font-size:13px;color:var(--muted);">vs ${escapeHtml(data.pior_supermercado)}</span>
+                    <span style="margin-left:10px;font-size:13px;">Poupança: <strong>${data.poupanca_maxima}</strong></span>
+                </div>`;
+                
+                data.ranking.forEach((s, i) => {
+                    const isBest = i === 0;
+                    html += `<div class="rank-card ${isBest ? 'best' : ''}">
+                        <div class="position">${isBest ? '🥇' : i + 1}</div>
+                        <div class="info">
+                            <div class="name">${escapeHtml(s.supermercado)}</div>
+                            <div class="stats">${s.total_produtos} produtos analisados</div>
+                        </div>
+                        <div class="price">${formatCurrency(s.preco_medio)}</div>
+                    </div>`;
+                });
+                
+                div.innerHTML = html;
+            } catch(e) {
+                div.innerHTML = '<p style="color:var(--danger)">Erro: ' + e.message + '</p>';
+            }
+        }
+
+        // Tab: Categoria
+        async function analisarCategoria() {
+            const cat = document.getElementById('categoriaSelect').value;
+            if (!cat) { showToast('Selecione uma categoria', 'error'); return; }
+            
+            const div = document.getElementById('categoriaResults');
+            div.innerHTML = '<div class="loading">A analisar...</div>';
+            
+            try {
+                const r = await fetch('api/otimizar_compras.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ categoria: cat })
+                });
+                const data = await r.json();
+                if (!data.success) { div.innerHTML = '<p style="color:var(--danger)">' + data.error + '</p>'; return; }
+
+                let html = `<div style="margin-bottom:12px;padding:12px;background:#f0faf6;border-radius:var(--radius);">
+                    <strong style="color:var(--primary);">🏆 Melhor para ${escapeHtml(cat)}: ${escapeHtml(data.melhor_supermercado)}</strong>
+                    <span style="margin-left:10px;font-size:13px;">Poupança estimada: <strong>${data.poupanca_estimada}</strong></span>
+                </div>`;
+
+                Object.entries(data.stats).forEach(([supermercado, info]) => {
+                    html += `<div class="rank-card ${supermercado === data.melhor_supermercado ? 'best' : ''}">
+                        <div class="position">${supermercado === data.melhor_supermercado ? '🥇' : '📊'}</div>
+                        <div class="info">
+                            <div class="name">${escapeHtml(supermercado)}</div>
+                            <div class="stats">${info.count} produtos • média ${formatCurrency(info.total / info.count)}</div>
+                        </div>
+                        <div class="price">${formatCurrency(info.total)}</div>
+                    </div>`;
+                });
+
+                div.innerHTML = html;
+            } catch(e) {
+                div.innerHTML = '<p style="color:var(--danger)">Erro: ' + e.message + '</p>';
+            }
+        }
+
+        // Tab: Lista
+        async function otimizarLista() {
+            const listaId = document.getElementById('listaSelect').value;
+            if (!listaId) { showToast('Selecione uma lista', 'error'); return; }
+
+            const div = document.getElementById('listaResults');
+            div.innerHTML = '<div class="loading">🤖 IA a otimizar a sua lista...</div>';
+
+            try {
+                const r = await fetch('api/otimizar_compras.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lista_id: parseInt(listaId) })
+                });
+                const data = await r.json();
+                if (!data.success) { div.innerHTML = '<p style="color:var(--danger)">' + data.error + '</p>'; return; }
+
+                let html = `<div style="margin-bottom:12px;padding:12px;background:#f0faf6;border-radius:var(--radius);">
+                    <strong style="color:var(--primary);">💰 Total otimizado: ${formatCurrency(data.total_otimizado)}</strong>
+                    <span style="margin-left:10px;font-size:13px;">Economia: <strong>${formatCurrency(data.economia_estimada)}</strong></span>
+                    <span style="margin-left:10px;font-size:13px;">• ${data.items_analisados} produtos analisados</span>
+                </div>`;
+
+                // Por supermercado
+                Object.entries(data.por_supermercado).forEach(([supermercado, info]) => {
+                    html += `<div class="supermercado-group">
+                        <h3>
+                            <span>🛒 ${escapeHtml(supermercado)}</span>
+                            <span style="color:var(--primary);">${formatCurrency(info.total)}</span>
+                        </h3>`;
+                    
+                    info.items.forEach(item => {
+                        html += `<div class="result-item">
+                            <div class="header">
+                                <div>
+                                    <div class="product-name">${escapeHtml(item.producto)} ${item.marca ? '- ' + escapeHtml(item.marca) : ''}</div>
+                                    <div class="supermercado-name">${escapeHtml(item.melhor_supermercado)} • ${item.quantidade}x</div>
+                                </div>
+                                <div class="price">${formatCurrency(item.preco_total)}</div>
+                            </div>
+                            <div class="prices-compare">
+                                ${item.todos_precos.map(p => `
+                                    <span class="tag ${p.supermercado === item.melhor_supermercado ? 'best' : ''}">
+                                        ${escapeHtml(p.supermercado)}: ${formatCurrency(p.preco)}
+                                    </span>
+                                `).join('')}
+                            </div>
+                        </div>`;
+                    });
+                    
+                    html += `</div>`;
+                });
+
+                div.innerHTML = html;
+            } catch(e) {
+                div.innerHTML = '<p style="color:var(--danger)">Erro: ' + e.message + '</p>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCategories();
+            loadLists();
+        });
+    </script>
+</body>
+</html>

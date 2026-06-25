@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CompraDelMes - Compare preços de supermercados e poupe nas suas compras">
+    <meta name="theme-color" content="#11845b">
+    <title>CompraDelMes - Comparar Preços</title>
+    <link rel="stylesheet" href="assets/css/compradelmes.css">
+    <style>
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+            transition: color 0.2s;
+        }
+        .back-link:hover { color: var(--primary); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← Voltar ao início</a>
+        
+        <header>
+            <h1>CompraDel<span>Mes</span></h1>
+            <div class="header-actions">
+                <button class="btn btn-primary" onclick="showNewListModal()" aria-label="Criar nova lista">+ Nova Lista</button>
+            </div>
+        </header>
+
+        <div class="dashboard-strip" role="status" aria-live="polite">
+            <div class="metric">
+                <span>Listas ativas</span>
+                <strong id="metricLists">0</strong>
+            </div>
+            <div class="metric">
+                <span>Produtos planeados</span>
+                <strong id="metricItems">0</strong>
+            </div>
+            <div class="metric">
+                <span>Total estimado</span>
+                <strong id="metricTotal">0,00€</strong>
+            </div>
+        </div>
+        
+        <div class="main-grid">
+            <!-- Left Column: Search & Products -->
+            <div>
+                <div class="card">
+                    <h2>Pesquisar produtos</h2>
+                    <div class="search-box" role="search">
+                        <input type="text" id="searchInput" placeholder="Pesquisar produto ou marca..." oninput="searchProducts()" aria-label="Pesquisar produtos">
+                        <select id="categoriaFilter" onchange="searchProducts()" aria-label="Filtrar por categoria">
+                            <option value="">Todas as categorias</option>
+                        </select>
+                    </div>
+                    <div id="searchResults" class="search-results" role="region" aria-live="polite">
+                        <div class="empty-state">
+                            <div class="icon">🔎</div>
+                            <p>Pesquise por um produto para comparar preços</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card" id="priceComparison" style="display:none;">
+                    <h2>Comparação de preços</h2>
+                    <div id="productInfo"></div>
+                    <div id="priceList" class="price-comparison"></div>
+                    <div id="addToListSection" class="add-to-list" style="display:none;">
+                        <label>Quantidade:</label>
+                        <input type="number" id="addQuantity" value="1" min="1" aria-label="Quantidade">
+                        <select id="listaSelect" aria-label="Selecionar lista">
+                            <option value="">Selecionar lista...</option>
+                        </select>
+                        <button class="btn btn-primary btn-sm" onclick="addToList()">Adicionar</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Catálogo de produtos</h2>
+                    <p style="font-size:13px;color:var(--gray);margin-bottom:12px;">
+                        Popule a base de dados com centenas de produtos de supermercado organizados por categorias.
+                    </p>
+                    <div class="header-actions" style="margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap;">
+                        <button class="btn btn-primary" onclick="seedCatalogo()">📦 Catálogo completo</button>
+                        <button class="btn btn-secondary" onclick="scrapCatalogo('mercadona')">🛒 Mercadona</button>
+                        <button class="btn btn-secondary" onclick="scrapCatalogo('pingodoce')">🛒 Pingo Doce</button>
+                        <button class="btn btn-secondary" onclick="scrapCatalogo('lidl')">🛒 Lidl</button>
+                    </div>
+                    <div id="scrapResults" style="display:none;"></div>
+                </div>
+
+                <div class="card">
+                    <h2>Preços dos produtos</h2>
+                    <p style="font-size:13px;color:var(--gray);margin-bottom:12px;">
+                        Gere preços realistas para todos os produtos em cada supermercado, baseados nas categorias.
+                    </p>
+                    <div class="header-actions" style="margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap;">
+                        <button class="btn btn-primary" onclick="gerarPrecos('all')">💰 Gerar preços (todos)</button>
+                        <button class="btn btn-secondary" onclick="gerarPrecos('continente')">💰 Continente</button>
+                        <button class="btn btn-secondary" onclick="gerarPrecos('pingo doce')">💰 Pingo Doce</button>
+                        <button class="btn btn-secondary" onclick="gerarPrecos('auchan')">💰 Auchan</button>
+                        <button class="btn btn-secondary" onclick="gerarPrecos('mercadona')">💰 Mercadona</button>
+                        <button class="btn btn-secondary" onclick="gerarPrecos('lidl')">💰 Lidl</button>
+                    </div>
+                    <div id="priceGenResults" style="display:none;"></div>
+                </div>
+
+                <div class="card">
+                    <h2>Buscar preços reais online</h2>
+                    <p style="font-size:13px;color:var(--gray);margin-bottom:12px;">
+                        Tenta buscar preços reais nos sites dos supermercados (pode demorar).
+                    </p>
+                    <div class="header-actions" style="margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap;">
+                        <button class="btn btn-warning" onclick="buscarPreciosMasivo('all')">🌐 Todos os supermercados</button>
+                        <button class="btn btn-secondary" onclick="buscarPreciosMasivo('continente')">🌐 Continente</button>
+                        <button class="btn btn-secondary" onclick="buscarPreciosMasivo('pingo doce')">🌐 Pingo Doce</button>
+                        <button class="btn btn-secondary" onclick="buscarPreciosMasivo('auchan')">🌐 Auchan</button>
+                        <button class="btn btn-secondary" onclick="buscarPreciosMasivo('mercadona')">🌐 Mercadona</button>
+                        <button class="btn btn-secondary" onclick="buscarPreciosMasivo('lidl')">🌐 Lidl</button>
+                    </div>
+                    <div id="priceSearchResults" style="display:none;"></div>
+                </div>
+
+                <div class="card">
+                    <h2>Automatização de preços</h2>
+                    <div class="automation-grid">
+                        <select id="autoProductoSelect" aria-label="Selecionar produto">
+                            <option value="">Produto...</option>
+                        </select>
+                        <select id="autoSupermercadoSelect" aria-label="Selecionar supermercado">
+                            <option value="">Supermercado...</option>
+                        </select>
+                        <button class="btn btn-secondary" onclick="searchAutoPrice()" id="autoSearchBtn">🔍 Buscar preços</button>
+                    </div>
+                    <div id="autoSearchResults" style="display:none;margin-bottom:12px;">
+                        <div style="margin-bottom:8px;font-size:13px;color:var(--muted);">
+                            Resultados encontrados: <strong id="autoResultsCount">0</strong>
+                        </div>
+                        <div id="autoResultsList" style="max-height:300px;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);">
+                        </div>
+                    </div>
+                    <div class="header-actions" style="margin-bottom:12px;">
+                        <button class="btn btn-warning" onclick="updateAllSources()">Atualizar preços</button>
+                    </div>
+                    <div id="automationSources">
+                        <div class="empty-state" style="padding:20px;">
+                            <p>Escolha um produto e supermercado, clique em "Buscar preços" e escolha um resultado para guardar.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Column: Shopping Lists -->
+            <div>
+                <div class="card">
+                    <h2>Listas de compras</h2>
+                    <div id="listasContainer">
+                        <div class="empty-state">
+                            <div class="icon">📝</div>
+                            <p>Crie uma nova lista para começar</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- New List Modal -->
+    <div class="modal-overlay" id="newListModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal">
+            <h2 id="modalTitle">Nova Lista de Compras</h2>
+            <input type="text" id="newListName" placeholder="Nome da lista (ex: Compras Julho)" onkeydown="if(event.key==='Enter') createList()" aria-label="Nome da lista">
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal('newListModal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="createList()">Criar Lista</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast -->
+    <div class="toast" id="toast" role="alert" aria-live="assertive"></div>
+    
+    <script src="assets/js/compradelmes.js"></script>
+</body>
+</html>

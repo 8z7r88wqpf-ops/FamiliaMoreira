@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CompraDelMes - Stock da Cozinha</title>
+    <link rel="stylesheet" href="assets/css/compradelmes.css">
+    <style>
+        .back-link { display:inline-flex;align-items:center;gap:6px;color:var(--muted);text-decoration:none;font-size:.85rem;margin-bottom:12px; }
+        .back-link:hover { color:var(--primary); }
+        .stock-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px; }
+        .stock-item { border:1px solid var(--line);border-radius:var(--radius);padding:14px; }
+        .stock-item .nome { font-weight:700; }
+        .stock-item .meta { font-size:.85rem;color:var(--muted);margin:4px 0; }
+        .stock-item .qtd { font-size:1.2rem;font-weight:700;color:var(--primary); }
+        .stock-item .validade { font-size:.8rem; }
+        .stock-item .validade.expirando { color:var(--warning); }
+        .stock-item .validade.expirado { color:var(--danger); }
+        .alerta-expiracao { padding:12px;border-radius:var(--radius);margin-bottom:12px; }
+        .alerta-expiracao.danger { background:#fef2f2;border:1px solid var(--danger);color:var(--danger); }
+        .alerta-expiracao.warning { background:#fffbeb;border:1px solid var(--warning);color:#92400e; }
+        .local-tag { display:inline-block;padding:2px 8px;border-radius:12px;font-size:.75rem;font-weight:600;background:var(--bg); }
+    </style>
+</head>
+<body>
+<div class="container">
+    <a href="index.html" class="back-link">← Voltar ao início</a>
+    <header><h1>Stock da <span>Cozinha</span></h1>
+        <div class="header-actions">
+            <button class="btn btn-primary" onclick="showAddModal()">+ Adicionar</button>
+            <button class="btn btn-warning" onclick="verExpirados()">⚠️ Expirados</button>
+        </div>
+    </header>
+
+    <div id="alertas"></div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <input type="text" id="searchStock" placeholder="Pesquisar no stock..." oninput="loadStock()" style="flex:1;padding:8px;border:1px solid var(--line);border-radius:var(--radius);">
+        <button class="btn btn-secondary" onclick="loadStock('todos')">Todos</button>
+        <button class="btn btn-secondary" onclick="loadStock('Dispensa')">🍚 Dispensa</button>
+        <button class="btn btn-secondary" onclick="loadStock('Frigorífico')">❄️ Frigorífico</button>
+        <button class="btn btn-secondary" onclick="loadStock('Congelador')">🧊 Congelador</button>
+    </div>
+    <div id="stockContainer" class="stock-grid"></div>
+</div>
+
+<div class="modal-overlay" id="addModal"><div class="modal">
+    <h2>Adicionar ao Stock</h2>
+    <select id="produtoSelect" style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--line);border-radius:var(--radius);"><option value="">Selecionar produto...</option></select>
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <input type="number" id="qtdInput" value="1" min="0.1" step="0.1" style="flex:1;padding:8px;border:1px solid var(--line);border-radius:var(--radius);">
+        <select id="unidadeSelect" style="padding:8px;border:1px solid var(--line);border-radius:var(--radius);">
+            <option value="un">un</option><option value="kg">kg</option><option value="g">g</option><option value="L">L</option><option value="ml">ml</option>
+        </select>
+    </div>
+    <select id="localSelect" style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--line);border-radius:var(--radius);">
+        <option value="Dispensa">🍚 Dispensa</option><option value="Frigorífico">❄️ Frigorífico</option><option value="Congelador">🧊 Congelador</option><option value="Despensa">📦 Despensa</option>
+    </select>
+    <input type="date" id="validadeInput" style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--line);border-radius:var(--radius);">
+    <textarea id="notasInput" placeholder="Notas..." style="width:100%;padding:8px;margin-bottom:8px;border:1px solid var(--line);border-radius:var(--radius);"></textarea>
+    <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal('addModal')">Cancelar</button>
+        <button class="btn btn-primary" onclick="addStock()">Adicionar</button>
+    </div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+<script>
+    const API = { async get(u){const r=await fetch(u);if(!r.ok)throw new Error();return r.json()}, 
+        async post(u,d){const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(!r.ok)throw new Error();return r.json()},
+        async del(u){const r=await fetch(u,{method:'DELETE'});if(!r.ok)throw new Error();return r.json()}};
+
+    function showToast(m,t='success'){const e=document.getElementById('toast');e.textContent=m;e.className='toast '+t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),3000);}
+    function closeModal(id){document.getElementById(id).classList.remove('active');}
+    function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]));}
+
+    async function loadStock(local) {
+        let url = 'api/stock.php?';
+        const search = document.getElementById('searchStock').value;
+        if (search) url += '&search='+encodeURIComponent(search);
+        if (local && local !== 'todos') url += '&localizacao='+encodeURIComponent(local);
+        
+        try {
+            const data = await API.get(url);
+            const container = document.getElementById('stockContainer');
+            if (data.length === 0) { container.innerHTML = '<div class="empty-state"><p>Stock vazio</p></div>'; return; }
+            
+            container.innerHTML = data.map(s => {
+                const hoje = new Date();
+                const val = s.data_validade ? new Date(s.data_validade) : null;
+                let valClass = '', valText = '';
+                if (val) {
+                    const diff = Math.ceil((val - hoje) / (1000*60*60*24));
+                    if (diff < 0) { valClass = 'expirado'; valText = `⚠️ Expirado há ${Math.abs(diff)} dias`; }
+                    else if (diff <= 3) { valClass = 'expirando'; valText = `⏳ Expira em ${diff} dia(s)`; }
+                    else valText = `📅 Válido até ${val.toLocaleDateString('pt-PT')}`;
+                }
+                return `<div class="stock-item">
+                    <div style="display:flex;justify-content:space-between;align-items:start;">
+                        <div>
+                            <div class="nome">${escapeHtml(s.produto_nome)}</div>
+                            <div class="meta">${s.marca ? escapeHtml(s.marca)+' • ':''}${escapeHtml(s.categoria||'')}</div>
+                        </div>
+                        <div class="qtd">${s.quantidade} ${s.unidade}</div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+                        <span class="local-tag">${s.localizacao === 'Frigorífico' ? '❄️' : s.localizacao === 'Congelador' ? '🧊' : '🍚'} ${s.localizacao}</span>
+                        <div>
+                            <button class="btn btn-sm btn-secondary" onclick="usarStock(${s.id}, ${s.quantidade})">Usar</button>
+                            <button class="btn btn-sm btn-danger" onclick="removerStock(${s.id})">✕</button>
+                        </div>
+                    </div>
+                    ${val ? `<div class="validade ${valClass}">${valText}</div>` : ''}
+                    ${s.notas ? `<div class="meta">📝 ${escapeHtml(s.notas)}</div>` : ''}
+                </div>`;
+            }).join('');
+            
+            // Alertas de expiração
+            verificarExpirados();
+        } catch(e) { document.getElementById('stockContainer').innerHTML = '<p style="color:var(--danger)">Erro ao carregar</p>'; }
+    }
+
+    async function verificarExpirados() {
+        try {
+            const data = await API.get('api/stock.php?expirados=sim');
+            const div = document.getElementById('alertas');
+            if (data.length > 0) {
+                div.innerHTML = `<div class="alerta-expiracao danger">⚠️ ${data.length} produto(s) expirado(s) na sua cozinha!</div>`;
+            } else {
+                div.innerHTML = '';
+            }
+        } catch(e) {}
+    }
+
+    async function showAddModal() {
+        document.getElementById('addModal').classList.add('active');
+        try {
+            const r = await API.get('api/productos.php?limit=500');
+            const prods = r.productos || r;
+            const sel = document.getElementById('produtoSelect');
+            sel.innerHTML = '<option value="">Selecionar...</option>';
+            prods.forEach(p => {
+                sel.innerHTML += `<option value="${p.id}">${escapeHtml(p.nome)}${p.marca?' - '+escapeHtml(p.marca):''}</option>`;
+            });
+        } catch(e) {}
+    }
+
+    async function addStock() {
+        const pid = document.getElementById('produtoSelect').value;
+        if (!pid) { showToast('Selecione um produto','error'); return; }
+        try {
+            await API.post('api/stock.php', {
+                producto_id: parseInt(pid),
+                quantidade: parseFloat(document.getElementById('qtdInput').value),
+                unidade: document.getElementById('unidadeSelect').value,
+                localizacao: document.getElementById('localSelect').value,
+                data_validade: document.getElementById('validadeInput').value || null,
+                notas: document.getElementById('notasInput').value
+            });
+            showToast('Adicionado ao stock!');
+            closeModal('addModal');
+            loadStock();
+        } catch(e) { showToast('Erro ao adicionar','error'); }
+    }
+
+    async function usarStock(id, qtd) {
+        const nova = prompt(`Quantidade a usar (atual: ${qtd}):`, Math.min(1, qtd));
+        if (nova === null) return;
+        const restante = Math.max(0, qtd - parseFloat(nova));
+        try {
+            if (restante <= 0) await API.del('api/stock.php?id='+id);
+            else await API.post('api/stock.php', {quantidade: restante});
+            showToast('Stock atualizado!');
+            loadStock();
+        } catch(e) { showToast('Erro','error'); }
+    }
+
+    async function removerStock(id) {
+        if (!confirm('Remover este item?')) return;
+        try { await API.del('api/stock.php?id='+id); showToast('Removido'); loadStock(); }
+        catch(e) { showToast('Erro','error'); }
+    }
+
+    function verExpirados() { document.getElementById('searchStock').value=''; loadStock(); setTimeout(() => loadStock(), 100); }
+
+    document.addEventListener('DOMContentLoaded', () => loadStock());
+</script>
+</body>
+</html>

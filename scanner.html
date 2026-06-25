@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CompraDelMes - Scanner de Faturas</title>
+    <link rel="stylesheet" href="assets/css/compradelmes.css">
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+    <style>
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+            transition: color 0.2s;
+        }
+        .back-link:hover { color: var(--primary); }
+
+        .scanner-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 700px) {
+            .scanner-layout { grid-template-columns: 1fr; }
+        }
+
+        .dropzone {
+            border: 2px dashed var(--line);
+            border-radius: var(--radius);
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: var(--bg);
+        }
+        .dropzone:hover, .dropzone.dragover {
+            border-color: var(--primary);
+            background: #f0faf6;
+        }
+        .dropzone.has-image {
+            padding: 0;
+            border-style: solid;
+        }
+        .dropzone img {
+            max-width: 100%;
+            max-height: 500px;
+            border-radius: var(--radius);
+            display: block;
+        }
+        .dropzone-icon { font-size: 3rem; margin-bottom: 10px; }
+        .dropzone-text { color: var(--muted); font-size: 0.9rem; }
+        .dropzone-input { display: none; }
+
+        .camera-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .camera-section video {
+            width: 100%;
+            border-radius: var(--radius);
+            background: #000;
+            max-height: 300px;
+        }
+        .camera-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: var(--line);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 12px 0;
+        }
+        .progress-bar .fill {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .progress-status {
+            font-size: 0.85rem;
+            color: var(--muted);
+            text-align: center;
+        }
+
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .results-table th {
+            background: var(--bg);
+            padding: 8px 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid var(--line);
+        }
+        .results-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--line);
+        }
+        .results-table .prod-nome { min-width: 150px; }
+        .results-table .prod-preco { text-align: right; white-space: nowrap; }
+        .results-table .prod-status { text-align: center; }
+
+        .status-ok { color: var(--primary); font-weight: 600; }
+        .status-pending { color: var(--muted); }
+        .status-duplicate { color: var(--warning); }
+
+        .raw-text {
+            background: var(--bg);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            padding: 12px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 12px;
+        }
+
+        .preco-input {
+            width: 80px;
+            padding: 4px 8px;
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            text-align: right;
+            font-size: 0.85rem;
+        }
+        .nome-input {
+            padding: 4px 8px;
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            font-size: 0.85rem;
+            width: 100%;
+            min-width: 120px;
+        }
+
+        .btn-icon {
+            background: none;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: all 0.2s;
+        }
+        .btn-icon:hover { border-color: var(--primary); background: var(--bg); }
+
+        .supermercado-select {
+            padding: 8px 12px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            font-size: 0.9rem;
+            background: white;
+        }
+
+        .summary-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 12px;
+            background: var(--bg);
+            border-radius: var(--radius);
+            margin-bottom: 12px;
+        }
+        .summary-bar strong { color: var(--primary); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← Voltar ao início</a>
+        
+        <header>
+            <h1>Scanner de <span>Faturas</span></h1>
+            <div class="header-actions">
+                <span style="font-size:13px;color:var(--muted);">📸 IA que lê faturas automaticamente</span>
+            </div>
+        </header>
+
+        <div class="card">
+            <div class="scanner-layout">
+                <!-- LEFT: Upload / Camera -->
+                <div>
+                    <h2>📷 Capturar fatura</h2>
+                    <p style="font-size:13px;color:var(--gray);margin-bottom:12px;">
+                        Tire uma foto ou carregue uma imagem da sua fatura de supermercado.
+                    </p>
+
+                    <!-- Drop zone for upload -->
+                    <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+                        <div class="dropzone-icon" id="dropzoneIcon">📄</div>
+                        <div class="dropzone-text" id="dropzoneText">Clique para selecionar imagem<br>ou arraste uma foto para aqui</div>
+                        <input type="file" id="fileInput" class="dropzone-input" accept="image/*" onchange="handleFile(this.files[0])">
+                    </div>
+
+                    <!-- Camera capture -->
+                    <div class="camera-section" style="margin-top:12px;">
+                        <video id="cameraPreview" autoplay playsinline style="display:none;"></video>
+                        <div class="camera-actions">
+                            <button class="btn btn-secondary" onclick="startCamera()" id="cameraBtn">📷 Abrir câmara</button>
+                            <button class="btn btn-primary" onclick="captureCamera()" id="captureBtn" style="display:none;">📸 Capturar</button>
+                            <button class="btn btn-secondary" onclick="stopCamera()" id="stopCamBtn" style="display:none;">✋ Parar câmara</button>
+                        </div>
+                    </div>
+
+                    <!-- Supermarket selector -->
+                    <div style="margin-top:12px;">
+                        <label style="font-size:13px;font-weight:600;">Supermercado:</label>
+                        <select id="supermercadoSelect" class="supermercado-select" style="width:100%;margin-top:4px;">
+                            <option value="">Selecionar supermercado...</option>
+                        </select>
+                    </div>
+
+                    <!-- Scan button -->
+                    <button class="btn btn-primary" onclick="scanReceipt()" id="scanBtn" disabled style="width:100%;margin-top:12px;padding:14px;">
+                        🔍 Digitalizar fatura
+                    </button>
+
+                    <!-- Progress -->
+                    <div id="progressSection" style="display:none;margin-top:12px;">
+                        <div class="progress-bar"><div class="fill" id="progressFill"></div></div>
+                        <div class="progress-status" id="progressStatus">A preparar...</div>
+                    </div>
+                </div>
+
+                <!-- RIGHT: Raw text from OCR -->
+                <div>
+                    <h2>📝 Texto detetado</h2>
+                    <p style="font-size:13px;color:var(--gray);margin-bottom:12px;">
+                        Texto extraído automaticamente pela IA de visão computacional.
+                    </p>
+                    <div class="raw-text" id="rawText">
+                        Aguardando imagem...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RESULTS -->
+        <div class="card" id="resultsCard" style="display:none;">
+            <h2>📊 Produtos detetados</h2>
+            <div class="summary-bar" id="summaryBar">
+                <span>Produtos encontrados: <strong id="totalDetected">0</strong></span>
+                <span>Novos: <strong id="totalNew" style="color:var(--primary);">0</strong></span>
+                <span>Total estimado: <strong id="totalPrice">0,00€</strong></span>
+            </div>
+            
+            <div style="overflow-x:auto;">
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Produto</th>
+                            <th>Marca</th>
+                            <th style="text-align:right;">Preço</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="importAll()">💾 Importar todos os produtos</button>
+                <button class="btn btn-secondary" onclick="clearResults()">🗑️ Limpar resultados</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast" role="alert" aria-live="assertive"></div>
+
+    <script>
+        // ========== STATE ==========
+        let currentFile = null;
+        let scannedItems = [];
+        let cameraStream = null;
+        let isScanning = false;
+        const Tesseract = window.Tesseract;
+
+        // ========== TOAST ==========
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast ' + type;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // ========== CAMERA ==========
+        async function startCamera() {
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                const video = document.getElementById('cameraPreview');
+                video.srcObject = cameraStream;
+                video.style.display = 'block';
+                document.getElementById('cameraBtn').style.display = 'none';
+                document.getElementById('captureBtn').style.display = 'inline-block';
+                document.getElementById('stopCamBtn').style.display = 'inline-block';
+            } catch (e) {
+                showToast('Erro ao abrir câmara: ' + e.message, 'error');
+            }
+        }
+
+        function stopCamera() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(t => t.stop());
+                cameraStream = null;
+            }
+            document.getElementById('cameraPreview').style.display = 'none';
+            document.getElementById('cameraBtn').style.display = 'inline-block';
+            document.getElementById('captureBtn').style.display = 'none';
+            document.getElementById('stopCamBtn').style.display = 'none';
+        }
+
+        function captureCamera() {
+            const video = document.getElementById('cameraPreview');
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            canvas.toBlob(blob => {
+                const file = new File([blob], 'fatura.jpg', { type: 'image/jpeg' });
+                handleFile(file);
+                stopCamera();
+            }, 'image/jpeg', 0.95);
+        }
+
+        // ========== FILE HANDLING ==========
+        function handleFile(file) {
+            if (!file) return;
+            currentFile = file;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const dropzone = document.getElementById('dropzone');
+                dropzone.classList.add('has-image');
+                dropzone.innerHTML = `<img src="${e.target.result}" alt="Fatura">`;
+                document.getElementById('scanBtn').disabled = false;
+                showToast('Imagem carregada! Clique em "Digitalizar fatura"', 'success');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Setup drag & drop
+        const dropzone = document.getElementById('dropzone');
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('dragover');
+        });
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('dragover');
+        });
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                handleFile(file);
+            } else {
+                showToast('Por favor, arraste um ficheiro de imagem', 'error');
+            }
+        });
+
+        // ========== LOAD SUPERMARKETS ==========
+        async function loadSupermercados() {
+            try {
+                const res = await fetch('api/supermercados.php');
+                const data = await res.json();
+                const select = document.getElementById('supermercadoSelect');
+                data.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.textContent = s.nome;
+                    select.appendChild(opt);
+                });
+            } catch (e) {
+                console.error('Failed to load supermarkets:', e);
+            }
+        }
+
+        // ========== SCAN RECEIPT ==========
+        async function scanReceipt() {
+            if (isScanning || !currentFile) return;
+            isScanning = true;
+
+            const supermercadoId = document.getElementById('supermercadoSelect').value;
+            if (!supermercadoId) {
+                showToast('Selecione o supermercado da fatura', 'error');
+                isScanning = false;
+                return;
+            }
+
+            const scanBtn = document.getElementById('scanBtn');
+            scanBtn.disabled = true;
+            scanBtn.textContent = '⏳ A digitalizar...';
+
+            document.getElementById('progressSection').style.display = 'block';
+            updateProgress(5, 'A preparar imagem...');
+
+            try {
+                // Convert file to image data
+                const imageData = await fileToImageData(currentFile);
+                
+                updateProgress(15, 'A extrair texto com IA...');
+                
+                // Run Tesseract OCR
+                const result = await Tesseract.recognize(
+                    imageData,
+                    'por', // Portuguese
+                    {
+                        logger: (m) => {
+                            if (m.status === 'recognizing text') {
+                                const pct = Math.round(m.progress * 70) + 15;
+                                updateProgress(pct, `A ler texto... ${Math.round(m.progress * 100)}%`);
+                            }
+                        }
+                    }
+                );
+
+                updateProgress(90, 'A analisar produtos...');
+
+                const text = result.data.text;
+                document.getElementById('rawText').textContent = text;
+
+                // Parse products from receipt text
+                const items = parseReceiptText(text);
+                scannedItems = items;
+
+                updateProgress(100, 'Digitalização completa!');
+
+                // Show results
+                showResults(items);
+                showToast(`Encontrados ${items.length} produtos na fatura!`, 'success');
+
+            } catch (e) {
+                showToast('Erro na digitalização: ' + e.message, 'error');
+                document.getElementById('rawText').textContent = 'Erro: ' + e.message;
+            } finally {
+                isScanning = false;
+                scanBtn.disabled = false;
+                scanBtn.textContent = '🔍 Digitalizar fatura';
+                document.getElementById('progressSection').style.display = 'none';
+            }
+        }
+
+        function fileToImageData(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function updateProgress(pct, status) {
+            document.getElementById('progressFill').style.width = pct + '%';
+            document.getElementById('progressStatus').textContent = status;
+        }
+
+        // ========== PARSE RECEIPT TEXT ==========
+        function parseReceiptText(text) {
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            const items = [];
+            
+            // Patterns for Portuguese receipts
+            // Common patterns: "PRODUTO 1,99" or "PRODUTO 1.99" or "PRODUTO 1,99 €"
+            const pricePatterns = [
+                /^(.+?)\s+(\d+[.,]\d{2})\s*(?:€|EUR)?$/i,
+                /^(.+?)\s+(\d+[.,]\d{2})\s*[A-Z]/,
+                /^(\d+)\s+(.+?)\s+(\d+[.,]\d{2})\s*(?:€|EUR)?$/i,
+                /(.+?)\s+(\d+[.,]\d{2})\s*$/,
+            ];
+
+            // Try to match each line against price patterns
+            for (const line of lines) {
+                // Skip header/footer lines
+                if (isLineSkippable(line)) continue;
+
+                let matched = false;
+                for (const pattern of pricePatterns) {
+                    const match = line.match(pattern);
+                    if (match) {
+                        let nome = '';
+                        let preco = '';
+                        
+                        if (pattern === pricePatterns[2]) {
+                            // Format: quantity + name + price
+                            nome = match[2].trim();
+                            preco = match[3];
+                        } else {
+                            nome = match[1].trim();
+                            preco = match[match.length - 1];
+                        }
+
+                        // Clean up name
+                        nome = nome.replace(/\s+/g, ' ')
+                                   .replace(/^\d+\s*/, '') // remove leading numbers
+                                   .replace(/\s*€\s*$/, '')
+                                   .trim();
+
+                        // Skip if name is too short or looks like a total
+                        if (nome.length < 3) continue;
+                        if (isTotalLine(nome)) continue;
+
+                        const precoNum = parseFloat(preco.replace(',', '.'));
+                        if (isNaN(precoNum) || precoNum <= 0 || precoNum > 999) continue;
+
+                        // Detect brand from name
+                        const marca = detectMarca(nome);
+
+                        items.push({
+                            nome: nome,
+                            marca: marca,
+                            preco: precoNum,
+                            supermercado_id: document.getElementById('supermercadoSelect').value,
+                            categorias: categorizeProduct(nome),
+                            selected: true,
+                            status: 'pending'
+                        });
+                        matched = true;
+                        break;
+                    }
+                }
+            }
+
+            // Deduplicate by name (keep cheapest)
+            const seen = new Map();
+            return items.filter(item => {
+                const key = item.nome.toLowerCase();
+                if (seen.has(key)) {
+                    if (item.preco < seen.get(key).preco) {
+                        seen.set(key, item.preco);
+                        return true;
+                    }
+                    return false;
+                }
+                seen.set(key, item.preco);
+                return true;
+            });
+        }
+
+        function isLineSkippable(line) {
+            const skipPatterns = [
+                /^(total|subtotal|iva|nif|contribuinte|data|factura|fatura|obrigado|obrigada|volte|sempre|documento|cliente|caixa|operador|numero|n\.?º)/i,
+                /^\d{9,}$/,
+                /^\d{2}\/\d{2}\/\d{4}/,
+                /@/,
+                /www\./,
+                /\.(pt|com|org)$/i,
+                /^(€|EUR)/i,
+                /^(\+|\*)/
+            ];
+            return skipPatterns.some(p => p.test(line));
+        }
+
+        function isTotalLine(text) {
+            const totalWords = ['total', 'subtotal', 'soma', 'valor', 'troco', 'dinheiro', 'cartão', 'multibanco', 'numerário', 'cheque', 'ticket'];
+            return totalWords.some(w => text.toLowerCase().includes(w));
+        }
+
+        function detectMarca(nome) {
+            const marcas = [
+                'Mimosa', 'Gresso', 'Auchan', 'Continente', 'Pingo Doce',
+                'Milaneza', 'Pirá', 'Barilla', 'Caçarola', 'Cigala',
+                'Tio João', 'Danone', 'Puleva', 'Lactim', 'Terra Nostra',
+                'Planta', 'Parmalat', 'Moça', 'Coca-Cola', 'Fanta',
+                'Sprite', 'Sumol', 'Compal', 'Luso', 'Fastio', 'Vitalis',
+                'Super Bock', 'Sagres', 'Heineken', 'Corona', 'Delta',
+                'Sical', 'Buondi', 'Nescafé', 'Lipton', 'Kellogg\'s',
+                'Nestlé', 'Quaker', 'Nutrigéna', 'Tombom', 'Comur',
+                'Heinz', 'Kikkoman', 'Gallo', 'Carbonell', 'Andorinha',
+                'Fula', 'Olá', 'Knorr', 'Maggi', 'Torrié', 'Canderel',
+                'Nutella', 'Milka', 'Lindt', 'Triunfo', 'Iglo', 'Skip',
+                'Comfort', 'Somat', 'Ajax', 'Cif', 'Sanytol', 'Harpic',
+                'Scotch-Brite', 'Dove', 'Nivea', 'Colgate', 'Oral-B',
+                'Rexona', 'Renova', 'Gillette', 'Head & Shoulders',
+                'Johnson & Johnson', 'Primor', 'Arborio', 'Yutaka',
+                'Lea & Perrins', 'Sacla', 'Oliveira da Serra',
+                'Lactogal', 'Puleva', 'Casal Garcia', 'Mateus',
+                'Monte Velho', 'Casalinho', 'Gatão', 'Sandeman',
+                'Johnnie Walker', 'Comfort'
+            ];
+            
+            for (const marca of marcas) {
+                if (nome.toLowerCase().includes(marca.toLowerCase())) {
+                    return marca;
+                }
+            }
+            return '';
+        }
+
+        function categorizeProduct(nome) {
+            const lower = nome.toLowerCase();
+            if (lower.includes('arroz')) return 'Arroz';
+            if (lower.includes('massa') || lower.includes('esparguete') || lower.includes('macarrão') || lower.includes('penne') || lower.includes('fusilli') || lower.includes('lasanha')) return 'Massas';
+            if (lower.includes('leite') || lower.includes('iogurte') || lower.includes('queijo') || lower.includes('manteiga') || lower.includes('margarina') || lower.includes('natas')) return 'Laticínios';
+            if (lower.includes('frango') || lower.includes('bife') || lower.includes('carne') || lower.includes('porco') || lower.includes('vaca') || lower.includes('alcatra') || lower.includes('hamburguer')) return 'Carnes';
+            if (lower.includes('salmão') || lower.includes('bacalhau') || lower.includes('pescada') || lower.includes('atum') || lower.includes('camarão') || lower.includes('polvo') || lower.includes('peixe')) return 'Peixaria';
+            if (lower.includes('maçã') || lower.includes('banana') || lower.includes('laranja') || lower.includes('uva') || lower.includes('morango') || lower.includes('pêra') || lower.includes('kiwi') || lower.includes('ananás') || lower.includes('melancia') || lower.includes('melão') || lower.includes('limão') || lower.includes('manga') || lower.includes('abacate') || lower.includes('cereja')) return 'Frutas';
+            if (lower.includes('batata') || lower.includes('cenoura') || lower.includes('cebola') || lower.includes('alho') || lower.includes('tomate') || lower.includes('alface') || lower.includes('espinafre') || lower.includes('brócolos') || lower.includes('couve') || lower.includes('pimento') || lower.includes('pepino') || lower.includes('courgette') || lower.includes('beringela') || lower.includes('feijão') || lower.includes('ervilha') || lower.includes('milho')) return 'Legumes';
+            if (lower.includes('coca') || lower.includes('fanta') || lower.includes('sprite') || lower.includes('sumol') || lower.includes('compal') || lower.includes('refrigerante')) return 'Refrigerantes';
+            if (lower.includes('água') || lower.includes('luso') || lower.includes('fastio') || lower.includes('vitalis')) return 'Águas';
+            if (lower.includes('cerveja') || lower.includes('vinho') || lower.includes('whisky') || lower.includes('super bock') || lower.includes('sagres')) return 'Bebidas Alcoólicas';
+            if (lower.includes('café') || lower.includes('cápsulas') || lower.includes('delta') || lower.includes('sical') || lower.includes('buondi') || lower.includes('nescafé')) return 'Café';
+            if (lower.includes('chá')) return 'Chás';
+            if (lower.includes('cereais') || lower.includes('corn flakes') || lower.includes('estrelitas') || lower.includes('chocapic') || lower.includes('fitness') || lower.includes('granola') || lower.includes('aveia') || lower.includes('muesli')) return 'Cereais';
+            if (lower.includes('atum') || lower.includes('sardinha') || lower.includes('cavala') || lower.includes('conserva') || lower.includes('grão') || lower.includes('feijão') || lower.includes('cogumelos')) return 'Conservas';
+            if (lower.includes('ketchup') || lower.includes('maionese') || lower.includes('mostarda') || lower.includes('molho') || lower.includes('vinagre')) return 'Molhos';
+            if (lower.includes('azeite') || lower.includes('óleo') || lower.includes('gallo') || lower.includes('fula')) return 'Azeite e Óleos';
+            if (lower.includes('sal') || lower.includes('pimenta') || lower.includes('orégãos') || lower.includes('cominhos') || lower.includes('canela') || lower.includes('caldo') || lower.includes('knorr') || lower.includes('maggi')) return 'Temperos';
+            if (lower.includes('açúcar') || lower.includes('adoçante') || lower.includes('mel') || lower.includes('geleia') || lower.includes('nutella') || lower.includes('chocolate') || lower.includes('bolacha') || lower.includes('bolo')) return 'Açúcar';
+            if (lower.includes('pizza') || lower.includes('gelado') || lower.includes('rissóis') || lower.includes('pastéis') || lower.includes('croquetes') || lower.includes('lazanha') || lower.includes('batata frita')) return 'Congelados';
+            if (lower.includes('farinha')) return 'Farinhas';
+            if (lower.includes('pão') || lower.includes('torrada') || lower.includes('torrié')) return 'Padaria';
+            if (lower.includes('champô') || lower.includes('gel de banho') || lower.includes('sabonete') || lower.includes('pasta de dentes') || lower.includes('escova') || lower.includes('desodorizante') || lower.includes('papel higiénico') || lower.includes('lenços') || lower.includes('toalhitas') || lower.includes('cotonetes') || lower.includes('lâminas') || lower.includes('protetor solar') || lower.includes('dove') || lower.includes('nivea') || lower.includes('colgate') || lower.includes('rexona') || lower.includes('renova') || lower.includes('gillette')) return 'Higiene';
+            if (lower.includes('detergente') || lower.includes('amaciador') || lower.includes('lava-loiça') || lower.includes('pastilhas') || lower.includes('limpa') || lower.includes('desinfetante') || lower.includes('lixívia') || lower.includes('esponja') || lower.includes('saco') || lower.includes('película') || lower.includes('papel alumínio') || lower.includes('skip') || lower.includes('ajax') || lower.includes('cif') || lower.includes('sanytol') || lower.includes('harpic')) return 'Limpeza';
+            if (lower.includes('ovos')) return 'Ovos';
+            if (lower.includes('fiambre') || lower.includes('presunto') || lower.includes('chouriço') || lower.includes('salpicão') || lower.includes('mortadela') || lower.includes('salame') || lower.includes('paio') || lower.includes('linguiça') || lower.includes('morcela')) return 'Charcutaria';
+            return 'Mercearia';
+        }
+
+        // ========== SHOW RESULTS ==========
+        function showResults(items) {
+            const card = document.getElementById('resultsCard');
+            card.style.display = 'block';
+
+            const tbody = document.getElementById('resultsBody');
+            let total = 0;
+
+            tbody.innerHTML = items.map((item, idx) => {
+                total += item.preco;
+                return `
+                    <tr>
+                        <td>${idx + 1}</td>
+                        <td>
+                            <input type="text" class="nome-input" value="${escapeHtml(item.nome)}" 
+                                   onchange="updateItem(${idx}, 'nome', this.value)">
+                        </td>
+                        <td>
+                            <input type="text" style="width:100px;padding:4px 8px;border:1px solid var(--line);border-radius:4px;font-size:0.85rem;" 
+                                   value="${escapeHtml(item.marca)}" 
+                                   onchange="updateItem(${idx}, 'marca', this.value)">
+                        </td>
+                        <td class="prod-preco">
+                            <input type="number" class="preco-input" value="${item.preco.toFixed(2)}" step="0.01" min="0.01"
+                                   onchange="updateItem(${idx}, 'preco', parseFloat(this.value))">
+                            €
+                        </td>
+                        <td class="prod-status">
+                            <span class="status-pending">⏳ Novo</span>
+                        </td>
+                        <td>
+                            <input type="checkbox" checked onchange="toggleItem(${idx})" style="width:18px;height:18px;">
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('totalDetected').textContent = items.length;
+            document.getElementById('totalNew').textContent = items.length;
+            document.getElementById('totalPrice').textContent = formatCurrency(total);
+        }
+
+        function updateItem(idx, field, value) {
+            if (scannedItems[idx]) {
+                scannedItems[idx][field] = value;
+            }
+        }
+
+        function toggleItem(idx) {
+            if (scannedItems[idx]) {
+                scannedItems[idx].selected = !scannedItems[idx].selected;
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({
+                '&': '&', '<': '<', '>': '>', '"': '"', "'": '&#39;'
+            }[char]));
+        }
+
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('pt-PT', {
+                style: 'currency', currency: 'EUR'
+            }).format(Number(value || 0));
+        }
+
+        // ========== IMPORT ==========
+        async function importAll() {
+            const selectedItems = scannedItems.filter(i => i.selected);
+            if (selectedItems.length === 0) {
+                showToast('Nenhum produto selecionado para importar', 'error');
+                return;
+            }
+
+            const supermercadoId = document.getElementById('supermercadoSelect').value;
+            if (!supermercadoId) {
+                showToast('Selecione o supermercado', 'error');
+                return;
+            }
+
+            const btn = document.querySelector('.btn-primary:last-child');
+            btn.disabled = true;
+            btn.textContent = '⏳ A importar...';
+
+            try {
+                // Import each product
+                let imported = 0;
+                let errors = 0;
+
+                for (const item of selectedItems) {
+                    try {
+                        const res = await fetch('api/importar_precios.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                nome: item.nome,
+                                marca: item.marca || null,
+                                categoria: item.categorias || 'Mercearia',
+                                supermercado: getSupermercadoNome(supermercadoId),
+                                precio: item.preco,
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.created || data.updated) {
+                            imported++;
+                        } else {
+                            errors++;
+                        }
+                    } catch (e) {
+                        errors++;
+                    }
+                }
+
+                showToast(`${imported} produtos importados com sucesso!${errors ? ` (${errors} erros)` : ''}`, 'success');
+                
+                // Update status in table
+                const statusSpans = document.querySelectorAll('.status-pending');
+                statusSpans.forEach(span => {
+                    span.textContent = '✅ Importado';
+                    span.className = 'status-ok';
+                });
+
+            } catch (e) {
+                showToast('Erro na importação: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '💾 Importar todos os produtos';
+            }
+        }
+
+        function getSupermercadoNome(id) {
+            const select = document.getElementById('supermercadoSelect');
+            const option = select.options[select.selectedIndex];
+            return option ? option.text : '';
+        }
+
+        function clearResults() {
+            scannedItems = [];
+            document.getElementById('resultsCard').style.display = 'none';
+            document.getElementById('rawText').textContent = 'Aguardando imagem...';
+            showToast('Resultados limpos', 'success');
+        }
+
+        // ========== INIT ==========
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSupermercados();
+        });
+    </script>
+</body>
+</html>

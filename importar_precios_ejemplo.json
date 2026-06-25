@@ -1,0 +1,28 @@
+{
+  "productos": [
+    {
+      "nome": "Leite meio gordo 1L",
+      "marca": "Mimosa",
+      "categoria": "Laticinios",
+      "supermercado": "Continente",
+      "precio": 0.89,
+      "url": "https://www.continente.pt/"
+    },
+    {
+      "nome": "Leite meio gordo 1L",
+      "marca": "Mimosa",
+      "categoria": "Laticinios",
+      "supermercado": "Pingo Doce",
+      "precio": "0,91",
+      "url": "https://www.pingodoce.pt/"
+    },
+    {
+      "nome": "Arroz agulha 1kg",
+      "marca": "Caçarola",
+      "categoria": "Mercearia",
+      "supermercado": "Auchan",
+      "precio": 1.29,
+      "url": "https://www.auchan.pt/"
+    }
+  ]
+}

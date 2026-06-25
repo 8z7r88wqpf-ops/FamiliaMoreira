@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CompraDelMes - Finanças</title>
+    <link rel="stylesheet" href="assets/css/compradelmes.css">
+    <style>
+        .back-link { display:inline-flex;align-items:center;gap:6px;color:var(--muted);text-decoration:none;font-size:.85rem;margin-bottom:12px; }
+        .back-link:hover { color:var(--primary); }
+        .fin-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-bottom:20px; }
+        .fin-card { border:1px solid var(--line);border-radius:var(--radius);padding:20px;text-align:center; }
+        .fin-card .valor { font-size:1.8rem;font-weight:800;color:var(--primary);margin:8px 0; }
+        .fin-card .label { font-size:.85rem;color:var(--muted); }
+        .fin-card .compare { font-size:.8rem;color:var(--danger); }
+        .fin-table { width:100%;border-collapse:collapse;font-size:.9rem; }
+        .fin-table th { background:var(--bg);padding:10px 12px;text-align:left;font-weight:600;border-bottom:2px solid var(--line); }
+        .fin-table td { padding:10px 12px;border-bottom:1px solid var(--line); }
+        .high { color:var(--danger); }
+        .low { color:var(--primary); }
+        .progress-ring { width:120px;height:120px;margin:0 auto 10px;position:relative; }
+        .progress-ring svg { transform:rotate(-90deg); }
+        .progress-ring .bg { fill:none;stroke:var(--line);stroke-width:8; }
+        .progress-ring .fg { fill:none;stroke:var(--primary);stroke-width:8;stroke-linecap:round;transition:stroke-dasharray .5s; }
+        .progress-ring .center { position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.5rem;font-weight:800;color:var(--primary); }
+    </style>
+</head>
+<body>
+<div class="container">
+    <a href="index.html" class="back-link">← Voltar ao início</a>
+    <header><h1>💰 Finanças</h1>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="definirOrcamento()">🎯 Definir orçamento</button>
+        </div>
+    </header>
+
+    <div id="resumo" class="fin-grid"></div>
+
+    <div class="card">
+        <h2>📊 Gastos por Supermercado</h2>
+        <div id="gastosSupermercados" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+        <h2>📋 Últimas Compras</h2>
+        <div id="ultimasCompras" style="margin-top:12px;">
+            <div class="empty-state"><p>Complete uma lista de compras para ver o histórico</p></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="orcModal"><div class="modal">
+    <h2>🎯 Orçamento Mensal</h2>
+    <input type="number" id="orcValor" placeholder="Valor limite (€)" step="10" style="width:100%;padding:10px;margin-bottom:10px;border:1px solid var(--line);border-radius:var(--radius);font-size:1.1rem;">
+    <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal('orcModal')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarOrcamento()">Guardar</button>
+    </div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+<script>
+    const API={async get(u){const r=await fetch(u);if(!r.ok)throw new Error();return r.json()},async post(u,d){const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(!r.ok)throw new Error();return r.json()}};
+    function showToast(m,t='success'){const e=document.getElementById('toast');e.textContent=m;e.className='toast '+t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),3000);}
+    function closeModal(id){document.getElementById(id).classList.remove('active');}
+    function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]));}
+    function formatCurrency(v){return new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(Number(v||0));}
+
+    async function carregarFinancas() {
+        try {
+            // Obter listas com totais
+            const listas = await API.get('api/listas.php');
+            const resumo = document.getElementById('resumo');
+            
+            // Calcular gastos
+            let totalGasto = 0;
+            let totalListas = listas.length;
+            let gastosPorSuper = {};
+
+            listas.forEach(lista => {
+                const total = Number(lista.total_geral || 0);
+                totalGasto += total;
+                
+                if (lista.totals_by_supermarket) {
+                    Object.entries(lista.totals_by_supermarket).forEach(([supermercado, valor]) => {
+                        gastosPorSuper[supermercado] = (gastosPorSuper[supermercado] || 0) + Number(valor);
+                    });
+                }
+            });
+
+            // Estimar orçamento (guardado em localStorage)
+            const orcamento = parseFloat(localStorage.getItem('orcamento_mensal') || '0');
+            const percent = orcamento > 0 ? Math.min(100, Math.round((totalGasto / orcamento) * 100)) : 0;
+
+            resumo.innerHTML = `
+                <div class="fin-card">
+                    <div class="label">💰 Gasto Total (mês)</div>
+                    <div class="valor">${formatCurrency(totalGasto)}</div>
+                    <div class="compare">${totalListas} listas de compras</div>
+                </div>
+                <div class="fin-card">
+                    <div class="progress-ring">
+                        <svg width="120" height="120">
+                            <circle class="bg" cx="60" cy="60" r="52"/>
+                            <circle class="fg" cx="60" cy="60" r="52" 
+                                stroke-dasharray="${2*Math.PI*52}" 
+                                stroke-dashoffset="${2*Math.PI*52*(1 - percent/100)}"/>
+                        </svg>
+                        <div class="center">${percent}%</div>
+                    </div>
+                    <div class="label">Orçamento: ${formatCurrency(orcamento)}</div>
+                    <div class="compare">${orcamento > 0 ? `Restam ${formatCurrency(Math.max(0, orcamento - totalGasto))}` : 'Sem orçamento definido'}</div>
+                </div>
+                <div class="fin-card">
+                    <div class="label">📊 Média por lista</div>
+                    <div class="valor">${formatCurrency(totalListas > 0 ? totalGasto / totalListas : 0)}</div>
+                    <div class="compare">${totalListas} listas</div>
+                </div>
+            `;
+
+            // Gastos por supermercado
+            const gastosDiv = document.getElementById('gastosSupermercados');
+            const sorted = Object.entries(gastosPorSuper).sort((a,b) => b[1] - a[1]);
+            if (sorted.length === 0) {
+                gastosDiv.innerHTML = '<div class="empty-state"><p>Sem dados de gastos</p></div>';
+            } else {
+                const maxValor = sorted[0][1];
+                gastosDiv.innerHTML = sorted.map(([supermercado, valor]) => {
+                    const pct = maxValor > 0 ? (valor / maxValor) * 100 : 0;
+                    return `<div style="margin-bottom:10px;">
+                        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                            <span style="font-weight:600;">${escapeHtml(supermercado)}</span>
+                            <span style="font-weight:700;">${formatCurrency(valor)}</span>
+                        </div>
+                        <div style="height:8px;background:var(--line);border-radius:4px;overflow:hidden;">
+                            <div style="height:100%;width:${pct}%;background:var(--primary);border-radius:4px;"></div>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+
+            // Últimas compras
+            const comprasDiv = document.getElementById('ultimasCompras');
+            if (listas.length === 0) {
+                comprasDiv.innerHTML = '<div class="empty-state"><p>Complete uma lista de compras para ver o histórico</p></div>';
+            } else {
+                comprasDiv.innerHTML = `<table class="fin-table">
+                    <thead><tr><th>Lista</th><th>Produtos</th><th style="text-align:right;">Total</th></tr></thead>
+                    <tbody>
+                        ${listas.slice(0, 10).map(l => `
+                            <tr>
+                                <td><strong>${escapeHtml(l.nombre)}</strong></td>
+                                <td>${l.items_count || 0} itens</td>
+                                <td style="text-align:right;font-weight:700;">${formatCurrency(l.total_geral || 0)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>`;
+            }
+        } catch(e) { showToast('Erro ao carregar','error'); }
+    }
+
+    function definirOrcamento() {
+        const atual = localStorage.getItem('orcamento_mensal') || '';
+        document.getElementById('orcValor').value = atual;
+        document.getElementById('orcModal').classList.add('active');
+    }
+
+    function guardarOrcamento() {
+        const val = parseFloat(document.getElementById('orcValor').value);
+        if (val > 0) {
+            localStorage.setItem('orcamento_mensal', val.toString());
+            showToast('Orçamento definido!');
+            closeModal('orcModal');
+            carregarFinancas();
+        } else { showToast('Valor inválido','error'); }
+    }
+
+    document.addEventListener('DOMContentLoaded', carregarFinancas);
+</script>
+</body>
+</html>

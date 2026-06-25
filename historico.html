@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CompraDelMes - Histórico de Preços</title>
+    <link rel="stylesheet" href="assets/css/compradelmes.css">
+    <style>
+        .back-link { display:inline-flex;align-items:center;gap:6px;color:var(--muted);text-decoration:none;font-size:.85rem;margin-bottom:12px; }
+        .back-link:hover { color:var(--primary); }
+        .chart-container { height:300px;position:relative;margin:15px 0;padding:15px 0;border-bottom:1px solid var(--line); }
+        .chart-line { position:absolute;bottom:0;left:0;right:0;height:250px;display:flex;align-items:flex-end;gap:2px; }
+        .chart-bar { flex:1;min-width:3px;background:var(--primary);border-radius:2px 2px 0 0;opacity:.7;transition:opacity .2s;position:relative; }
+        .chart-bar:hover { opacity:1; }
+        .chart-bar .tooltip { display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#333;color:white;padding:4px 8px;border-radius:4px;font-size:.75rem;white-space:nowrap;z-index:10; }
+        .chart-bar:hover .tooltip { display:block; }
+        .chart-label { font-size:.7rem;color:var(--muted);text-align:center;margin-top:4px; }
+        .trend-card { border:1px solid var(--line);border-radius:var(--radius);padding:15px;margin-bottom:10px; }
+        .trend-card .nome { font-weight:700; }
+        .trend-card .variacao { font-size:1.1rem;font-weight:700; }
+        .trend-card .variacao.up { color:var(--danger); }
+        .trend-card .variacao.down { color:var(--primary); }
+        .trend-card .info { font-size:.85rem;color:var(--muted); }
+        .stats-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px; }
+        .stat-card { border:1px solid var(--line);border-radius:var(--radius);padding:16px;text-align:center; }
+        .stat-card .num { font-size:1.5rem;font-weight:800;color:var(--primary); }
+        .stat-card .label { font-size:.8rem;color:var(--muted); }
+    </style>
+</head>
+<body>
+<div class="container">
+    <a href="index.html" class="back-link">← Voltar ao início</a>
+    <header><h1>📈 Histórico de <span>Preços</span></h1>
+        <div class="header-actions">
+            <span style="font-size:13px;color:var(--muted);">Evolução e tendências</span>
+        </div>
+    </header>
+
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <div class="card">
+        <h2>🔍 Ver histórico de um produto</h2>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+            <select id="prodSelect" style="flex:1;padding:8px;border:1px solid var(--line);border-radius:var(--radius);">
+                <option value="">Selecionar produto...</option>
+            </select>
+            <select id="diasSelect" style="width:80px;padding:8px;border:1px solid var(--line);border-radius:var(--radius);">
+                <option value="7">7 dias</option>
+                <option value="30" selected>30 dias</option>
+                <option value="90">90 dias</option>
+            </select>
+            <button class="btn btn-primary" onclick="verHistorico()">📊 Ver</button>
+        </div>
+        <div id="chartContainer" style="display:none;margin-top:15px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                <h3 id="chartTitle"></h3>
+                <span id="chartStats" style="font-size:.85rem;color:var(--muted);"></span>
+            </div>
+            <div class="chart-container" id="chart"></div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+        <h2>📊 Produtos com maior variação</h2>
+        <p style="font-size:13px;color:var(--gray);margin-bottom:12px;">Produtos cujo preço mudou mais de 5% nos últimos 30 dias.</p>
+        <div id="trendsContainer"></div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+    const API={async get(u){const r=await fetch(u);if(!r.ok)throw new Error();return r.json()},async post(u,d){const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(!r.ok)throw new Error();return r.json()}};
+    function showToast(m,t='success'){const e=document.getElementById('toast');e.textContent=m;e.className='toast '+t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),3000);}
+    function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]));}
+    function formatCurrency(v){return new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(Number(v||0));}
+
+    async function init() {
+        // Carregar produtos
+        try {
+            const r = await API.get('api/productos.php?limit=500');
+            const prods = r.productos || r;
+            const sel = document.getElementById('prodSelect');
+            prods.forEach(p => {
+                sel.innerHTML += `<option value="${p.id}">${escapeHtml(p.nome)}${p.marca?' - '+escapeHtml(p.marca):''}</option>`;
+            });
+        } catch(e) {}
+
+        // Carregar análises
+        await carregarAnalises();
+        await carregarStats();
+    }
+
+    async function carregarStats() {
+        try {
+            const r = await API.get('api/precios.php');
+            const precios = Array.isArray(r) ? r : [];
+            const unicos = new Set(precios.map(p => p.producto_id));
+            const supermercados = new Set(precios.map(p => p.supermercado_nome));
+            
+            const stats = document.getElementById('statsGrid');
+            stats.innerHTML = `
+                <div class="stat-card"><div class="num">${precios.length}</div><div class="label">Preços registados</div></div>
+                <div class="stat-card"><div class="num">${unicos.size}</div><div class="label">Produtos com preço</div></div>
+                <div class="stat-card"><div class="num">${supermercados.size}</div><div class="label">Supermercados</div></div>
+                <div class="stat-card"><div class="num">${precios.length > 0 ? formatCurrency(precios.reduce((a,b)=>a+parseFloat(b.precio||0),0)/precios.length) : '0,00€'}</div><div class="label">Preço médio</div></div>
+            `;
+        } catch(e) {}
+    }
+
+    async function verHistorico() {
+        const pid = document.getElementById('prodSelect').value;
+        if (!pid) { showToast('Selecione um produto','error'); return; }
+        const dias = parseInt(document.getElementById('diasSelect').value);
+
+        try {
+            const data = await API.get('api/historico_precos.php?producto_id='+pid+'&dias='+dias);
+            const container = document.getElementById('chart');
+            const title = document.getElementById('chartTitle');
+            const stats = document.getElementById('chartStats');
+            
+            document.getElementById('chartContainer').style.display = 'block';
+
+            if (data.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>Sem dados históricos. Registe preços primeiro.</p></div>';
+                return;
+            }
+
+            // Agrupar por supermercado
+            const porSuper = {};
+            data.forEach(p => {
+                if (!porSuper[p.supermercado_nome]) porSuper[p.supermercado_nome] = [];
+                porSuper[p.supermercado_nome].push(p);
+            });
+
+            const produtoNome = data[0].supermercado_nome;
+            const supermercados = Object.keys(porSuper);
+            
+            title.textContent = `📈 ${document.getElementById('prodSelect').selectedOptions[0].text}`;
+
+            const precos = data.map(p => parseFloat(p.precio));
+            const min = Math.min(...precos);
+            const max = Math.max(...precos);
+            const avg = precos.reduce((a,b)=>a+b,0) / precos.length;
+            stats.textContent = `Mín: ${formatCurrency(min)} • Máx: ${formatCurrency(max)} • Média: ${formatCurrency(avg)}`;
+
+            // Desenhar gráfico por supermercado com cores
+            const cores = ['#11845b','#e6a817','#dc3545','#0d6efd','#6f42c1'];
+            container.innerHTML = supermercados.map((superNome, idx) => {
+                const pontos = porSuper[superNome];
+                const maxLocal = Math.max(...pontos.map(p => parseFloat(p.precio)));
+                const cor = cores[idx % cores.length];
+                
+                return `<div style="margin-bottom:15px;">
+                    <div style="font-size:.85rem;font-weight:600;margin-bottom:4px;color:${cor};">${escapeHtml(superNome)} (${pontos.length} registos)</div>
+                    <div class="chart-line" style="position:relative;height:100px;display:flex;align-items:flex-end;gap:2px;">
+                        ${pontos.map(p => {
+                            const altura = (parseFloat(p.precio) / maxLocal) * 100;
+                            const dataStr = new Date(p.fecha).toLocaleDateString('pt-PT');
+                            return `<div class="chart-bar" style="height:${altura}%;background:${cor};">
+                                <div class="tooltip">${formatCurrency(p.precio)}<br>${dataStr}</div>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>`;
+            }).join('');
+
+        } catch(e) { showToast('Erro ao carregar histórico','error'); }
+    }
+
+    async function carregarAnalises() {
+        try {
+            const data = await API.post('api/historico_precos.php', {action: 'analise'});
+            const container = document.getElementById('trendsContainer');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>Sem dados suficientes. Registe preços durante alguns dias.</p></div>';
+                return;
+            }
+            container.innerHTML = data.map(p => {
+                const isUp = p.variacao > 0;
+                return `<div class="trend-card">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <div class="nome">${escapeHtml(p.nome)}</div>
+                            <div class="info">${escapeHtml(p.categoria||'')} • ${p.leituras} leituras</div>
+                        </div>
+                        <div class="variacao ${isUp ? 'up' : 'down'}">
+                            ${isUp ? '📈 +' : '📉 '}${Math.abs(p.variacao)}%
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:12px;margin-top:8px;font-size:.85rem;">
+                        <span>Méd: ${formatCurrency(p.preco_medio)}</span>
+                        <span style="color:var(--primary);">Min: ${formatCurrency(p.preco_min)}</span>
+                        <span style="color:var(--danger);">Max: ${formatCurrency(p.preco_max)}</span>
+                    </div>
+                </div>`;
+            }).join('');
+        } catch(e) {
+            document.getElementById('trendsContainer').innerHTML = '<div class="empty-state"><p>Sem dados de histórico</p></div>';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
